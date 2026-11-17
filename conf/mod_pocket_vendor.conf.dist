@@ -1,0 +1,92 @@
+[worldserver]
+
+########################################
+# Pocket Vendor module configuration
+########################################
+#
+#    PocketVendor.Enable
+#        Description: Enable or disable the whole module.
+#        Default:     1 - Enabled
+#                     0 - Disabled
+#
+
+PocketVendor.Enable = 1
+
+#
+#    PocketVendor.Announce
+#        Description: How sales are reported in chat.
+#        Default:     2 - One summary line shortly after looting ("Sold 5 items for ...")
+#                     1 - One line per sold item
+#                     0 - No chat message
+#
+
+PocketVendor.Announce = 2
+
+#
+#    PocketVendor.SummaryDelay
+#        Description: Milliseconds to wait after the last sale before the summary line
+#                     is sent (only used when PocketVendor.Announce = 2).
+#        Default:     1000
+#
+
+PocketVendor.SummaryDelay = 1000
+
+#
+#    PocketVendor.SellCommonGear
+#        Description: Also sell white (common) weapons and armor.
+#                     Trade goods, shirts, tabards and fishing poles are never sold.
+#        Default:     0 - Only grey items
+#                     1 - Grey items and white weapons/armor
+#
+
+PocketVendor.SellCommonGear = 0
+
+#
+#    PocketVendor.Blacklist
+#        Description: Comma separated list of item IDs that are never sold.
+#        Example:     "3300,3301,7973"
+#        Default:     ""
+#
+
+PocketVendor.Blacklist = ""
+
+#
+#    PocketVendor.PlayerToggle
+#        Description: Allow players to turn auto-selling on/off for themselves
+#                     with ".vendor on" / ".vendor off".
+#                     The choice is only saved across logins when
+#                     EnablePlayerSettings = 1 in worldserver.conf.
+#        Default:     1 - Allowed
+#                     0 - Not allowed
+#
+
+PocketVendor.PlayerToggle = 1
+
+#
+#    PocketVendor.Playerbots
+#        Description: Whether bots (mod-playerbots) also auto-sell their junk.
+#        Default:     1 - Bots auto-sell too
+#                     0 - Bots keep their junk
+#
+
+PocketVendor.Playerbots = 1
+
+#
+#    PocketVendor.PlayerLists
+#        Description: Let players keep their own sell and keep lists with the
+#                     PocketVendor addon. Items on a player's sell list are sold on
+#                     loot whatever their quality; items on the keep list are never sold.
+#                     Quest items and items without a vendor price are always kept.
+#        Default:     1 - Enabled
+#                     0 - Disabled
+#
+
+PocketVendor.PlayerLists = 1
+
+#
+#    PocketVendor.MaxListSize
+#        Description: Maximum number of items per character across both lists.
+#        Default:     200
+#
+
+PocketVendor.MaxListSize = 200

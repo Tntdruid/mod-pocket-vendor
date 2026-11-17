@@ -1,0 +1,10 @@
+# Local config copies
+conf/*.conf
+conf/conf.sh
+
+# Editor and OS files
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store
