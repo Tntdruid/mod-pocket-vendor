@@ -1,6 +1,7 @@
 # Pocket Vendor
 
 An AzerothCore module that automatically sells junk when a player loots it, plus a small addon for personal sell and keep lists.
+<img width="501" height="607" alt="{749D2174-6965-49A7-B35E-B8E3239F3BD0}" src="https://github.com/user-attachments/assets/ac974610-bc4a-44f0-8a7d-1900d5b11e29" />
 
 ## What it does
 
