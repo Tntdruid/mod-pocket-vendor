@@ -184,8 +184,8 @@ namespace
             return true;
         }
 
-        // Quest items, items that start a quest, or that an active quest needs
-        if (proto->Class == ITEM_CLASS_QUEST || proto->StartQuest || player->HasQuestForItem(proto->ItemId))
+        // Items that start a quest, or that an active quest needs
+        if (proto->StartQuest || player->HasQuestForItem(proto->ItemId))
         {
             return true;
         }
@@ -204,6 +204,13 @@ namespace
         if (uint8 const* list = FindOnPlayerList(player, proto->ItemId))
         {
             return *list == LIST_SELL;
+        }
+
+        // Quest-class items (e.g. Green Hills of Stranglethorn pages) are only
+        // sold when the player put them on their sell list
+        if (proto->Class == ITEM_CLASS_QUEST)
+        {
+            return false;
         }
 
         if (proto->Quality == ITEM_QUALITY_POOR)
@@ -324,9 +331,9 @@ namespace
                 SendError(player, Acore::StringFormat("{} has no vendor price.", proto->Name1));
                 return;
             }
-            if (proto->Class == ITEM_CLASS_QUEST || proto->StartQuest)
+            if (proto->StartQuest)
             {
-                SendError(player, Acore::StringFormat("{} is a quest item and is never sold.", proto->Name1));
+                SendError(player, Acore::StringFormat("{} starts a quest and is never sold.", proto->Name1));
                 return;
             }
         }

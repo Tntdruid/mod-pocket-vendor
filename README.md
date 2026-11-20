@@ -13,7 +13,8 @@ An AzerothCore module that automatically sells junk when a player loots it, plus
 
 ## Never sold
 
-- Quest items, items that start a quest, and items one of the player's active quests needs
+- Items that start a quest, and items one of the player's active quests needs
+- Quest-class items such as Green Hills of Stranglethorn pages, unless the player puts them on their sell list
 - Items with no vendor value (they stay in the bags)
 - Items on the server's blacklist
 - Items on the player's keep list
@@ -71,6 +72,10 @@ The on/off choice is saved across logins only when `EnablePlayerSettings = 1` is
 Run `.reload config` to apply changes without restarting the server.
 
 ## Changelog
+
+### Unreleased
+
+- Fixed quest-class items such as Green Hills of Stranglethorn pages not being allowed on the sell list. They are still kept while an active quest needs them.
 
 ### v1.0.0
 
