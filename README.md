@@ -74,7 +74,7 @@ Run `.reload config` to apply changes without restarting the server.
 
 ## Changelog
 
-### Unreleased
+### v1.1.0
 
 - Added a question when you add a ranked item such as Scroll of Spirit IV to the Sell or Keep list: add every rank, or only that one. Ranks that can't be sold are skipped.
 - Fixed quest-class items such as Green Hills of Stranglethorn pages not being allowed on the sell list. They are still kept while an active quest needs them.
