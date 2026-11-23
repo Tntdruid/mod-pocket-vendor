@@ -15,6 +15,7 @@
 #include <iterator>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 using namespace Acore::ChatCommands;
 
@@ -313,8 +314,75 @@ namespace
         SendAddon(player, "ERR:" + text);
     }
 
+    // Item name without a trailing rank numeral: "Scroll of Spirit IV" -> "Scroll of Spirit"
+    std::string StripRank(std::string const& name)
+    {
+        std::size_t space = name.rfind(' ');
+        if (space == std::string::npos || space + 1 == name.size() || name.size() - space - 1 > 5)
+        {
+            return name;
+        }
+
+        for (std::size_t i = space + 1; i < name.size(); ++i)
+        {
+            if (name[i] != 'I' && name[i] != 'V' && name[i] != 'X' && name[i] != 'L')
+            {
+                return name;
+            }
+        }
+
+        return name.substr(0, space);
+    }
+
+    // Every rank of an item: same class and subclass, and a name that is the base name
+    // with or without a rank numeral. An item without a numeral has only itself.
+    std::vector<ItemTemplate const*> FindItemRanks(ItemTemplate const* item)
+    {
+        std::string baseName = StripRank(item->Name1);
+        if (baseName == item->Name1)
+        {
+            return { item };
+        }
+
+        std::vector<ItemTemplate const*> ranks;
+        for (auto const& [entry, proto] : *sObjectMgr->GetItemTemplateStore())
+        {
+            if (proto.Class != item->Class || proto.SubClass != item->SubClass)
+            {
+                continue;
+            }
+            if (proto.Name1 == baseName || StripRank(proto.Name1) == baseName)
+            {
+                ranks.push_back(&proto);
+            }
+        }
+        return ranks;
+    }
+
+    // Why an item can't go on the sell list, or an empty string when it can
+    std::string SellListBlocker(ItemTemplate const* proto)
+    {
+        if (proto->SellPrice == 0)
+        {
+            return Acore::StringFormat("{} has no vendor price.", proto->Name1);
+        }
+        if (proto->StartQuest)
+        {
+            return Acore::StringFormat("{} starts a quest and is never sold.", proto->Name1);
+        }
+        return {};
+    }
+
+    // idText is "<id>" for one item or "<id>:ALL" for every rank of it
     void HandleAdd(Player* player, char type, std::string_view idText)
     {
+        bool allRanks = false;
+        if (std::size_t colon = idText.find(':'); colon != std::string_view::npos)
+        {
+            allRanks = idText.substr(colon + 1) == "ALL";
+            idText = idText.substr(0, colon);
+        }
+
         Optional<uint32> itemId = Acore::StringTo<uint32>(idText);
         ItemTemplate const* proto = itemId ? sObjectMgr->GetItemTemplate(*itemId) : nullptr;
         if (!proto)
@@ -324,33 +392,59 @@ namespace
         }
 
         uint8 list = type == 'S' ? LIST_SELL : LIST_KEEP;
-        if (list == LIST_SELL)
+
+        std::vector<ItemTemplate const*> items;
+        for (ItemTemplate const* rank : allRanks ? FindItemRanks(proto) : std::vector<ItemTemplate const*>{ proto })
         {
-            if (proto->SellPrice == 0)
+            std::string blocker = list == LIST_SELL ? SellListBlocker(rank) : std::string();
+            if (blocker.empty())
             {
-                SendError(player, Acore::StringFormat("{} has no vendor price.", proto->Name1));
-                return;
+                items.push_back(rank);
             }
-            if (proto->StartQuest)
+            else if (!allRanks)
             {
-                SendError(player, Acore::StringFormat("{} starts a quest and is never sold.", proto->Name1));
+                // With all ranks, unsellable ranks are skipped quietly
+                SendError(player, blocker);
                 return;
             }
         }
 
+        if (items.empty())
+        {
+            SendError(player, Acore::StringFormat("No rank of {} can be sold.", StripRank(proto->Name1)));
+            return;
+        }
+
         PlayerLists* lists = player->CustomData.GetDefault<PlayerLists>(LISTS_KEY);
-        if (!lists->items.count(*itemId) && lists->items.size() >= sVendorConfig.maxListSize)
+        std::size_t newItems = 0;
+        for (ItemTemplate const* item : items)
+        {
+            newItems += lists->items.count(item->ItemId) ? 0 : 1;
+        }
+        if (lists->items.size() + newItems > sVendorConfig.maxListSize)
         {
             SendError(player, Acore::StringFormat("Your lists are full ({} items).", sVendorConfig.maxListSize));
             return;
         }
 
         // An item lives on one list only, so adding it moves it
-        lists->items[*itemId] = list;
-        CharacterDatabase.Execute("REPLACE INTO `mod_pocket_vendor_list` (`guid`, `item_id`, `list`) VALUES ({}, {}, {})",
-            player->GetGUID().GetCounter(), *itemId, list);
+        CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+        std::string added;
+        for (ItemTemplate const* item : items)
+        {
+            lists->items[item->ItemId] = list;
+            trans->Append("REPLACE INTO `mod_pocket_vendor_list` (`guid`, `item_id`, `list`) VALUES ({}, {}, {})",
+                player->GetGUID().GetCounter(), item->ItemId, list);
 
-        SendAddon(player, Acore::StringFormat("ADDED:{}:{}", type, *itemId));
+            if (!added.empty())
+            {
+                added += ',';
+            }
+            added += std::to_string(item->ItemId);
+        }
+        CharacterDatabase.CommitTransaction(trans);
+
+        SendAddon(player, Acore::StringFormat("ADDED:{}:{}", type, added));
     }
 
     void HandleRemove(Player* player, std::string_view idText)
@@ -381,7 +475,7 @@ namespace
         SendState(player);
     }
 
-    // Body formats: SYNC | ADD:S:<id> | ADD:K:<id> | DEL:<id> | TOGGLE:<0|1>
+    // Body formats: SYNC | ADD:<S|K>:<id>[:ALL] | DEL:<id> | TOGGLE:<0|1>
     void HandleAddonMessage(Player* player, std::string_view body)
     {
         if (body == "SYNC")

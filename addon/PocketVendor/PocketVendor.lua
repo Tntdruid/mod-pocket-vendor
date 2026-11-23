@@ -4,11 +4,12 @@
 -- characters database. This file only sends requests and mirrors the answers.
 --
 -- Client -> server (addon whisper to yourself, prefix PVEND):
---   SYNC | ADD:S:<id> | ADD:K:<id> | DEL:<id> | TOGGLE:<0|1>
+--   SYNC | ADD:<S|K>:<id>[:ALL] | DEL:<id> | TOGGLE:<0|1>
+--   (:ALL adds every rank of the item, e.g. Scroll of Spirit I-IV)
 -- Server -> client:
 --   STATE:<module on>:<auto-sell on>:<toggle allowed>
 --   LIST:BEGIN | LIST:S:<id,id,...> | LIST:K:<id,id,...> | LIST:END
---   ADDED:<S|K>:<id> | REMOVED:<id> | ERR:<text>
+--   ADDED:<S|K>:<id,id,...> | REMOVED:<id> | ERR:<text>
 
 local ADDON_NAME = ...
 local PREFIX = "PVEND"
@@ -61,6 +62,29 @@ function addon:Sync()
     addon.syncSentAt = GetTime()
 end
 
+local function SendAdd(id, listKey, allRanks)
+    Send((listKey == "keep" and "ADD:K:" or "ADD:S:") .. id .. (allRanks and ":ALL" or ""))
+end
+
+StaticPopupDialogs["POCKET_VENDOR_ALL_RANKS"] = {
+    text = "Add every rank of %s to your %s list, or only the one you picked?",
+    button1 = "All ranks",
+    button2 = "Only this",
+    OnAccept = function(self, data)
+        SendAdd(data.id, data.listKey, true)
+    end,
+    -- Escape also cancels; only the button adds the single item
+    OnCancel = function(self, data, reason)
+        if reason == "clicked" then
+            SendAdd(data.id, data.listKey, false)
+        end
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
 function addon:AddItem(input, listKey)
     local id = self:ToItemId(input)
     if not id then
@@ -71,7 +95,20 @@ function addon:AddItem(input, listKey)
         Print("|cffff8040The server module is not responding.|r")
         return
     end
-    Send((listKey == "keep" and "ADD:K:" or "ADD:S:") .. id)
+
+    -- Ranked items such as "Scroll of Spirit IV": offer to add the whole series
+    local name = GetItemInfo(id)
+    local baseName = name and name:match("^(.+) [IVXL]+$")
+    if baseName then
+        local listName = listKey == "keep" and "|cff00ff00Keep|r" or "|cffffd700Sell|r"
+        local dialog = StaticPopup_Show("POCKET_VENDOR_ALL_RANKS", "|cffffffff" .. baseName .. "|r", listName)
+        if dialog then
+            dialog.data = { id = id, listKey = listKey }
+            return
+        end
+    end
+
+    SendAdd(id, listKey, false)
 end
 
 function addon:RemoveItem(id)
@@ -119,17 +156,26 @@ local function OnServerMessage(body)
         return
     end
 
-    local addKind, addId = body:match("^ADDED:([SK]):(%d+)$")
+    local addKind, addIds = body:match("^ADDED:([SK]):([%d,]+)$")
     if addKind then
-        addId = tonumber(addId)
-        -- An item lives on one list only
-        addon.sell[addId] = nil
-        addon.keep[addId] = nil
         local target = addKind == "S" and addon.sell or addon.keep
-        target[addId] = true
+        local added = {}
+        for idText in addIds:gmatch("%d+") do
+            local id = tonumber(idText)
+            -- An item lives on one list only
+            addon.sell[id] = nil
+            addon.keep[id] = nil
+            target[id] = true
+            added[#added + 1] = id
+        end
 
-        local name = GetItemInfo(addId) or ("item:" .. addId)
-        Print(("Added %s to your %s list."):format(name, addKind == "S" and "|cffffd700sell|r" or "|cff00ff00keep|r"))
+        local listName = addKind == "S" and "|cffffd700sell|r" or "|cff00ff00keep|r"
+        local name = GetItemInfo(added[1]) or ("item:" .. added[1])
+        if #added == 1 then
+            Print(("Added %s to your %s list."):format(name, listName))
+        else
+            Print(("Added %d ranks of %s to your %s list."):format(#added, name:match("^(.+) [IVXL]+$") or name, listName))
+        end
         return Refresh()
     end
 

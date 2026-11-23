@@ -26,6 +26,7 @@ The addon is in `addon/PocketVendor`. Copy that folder to `World of Warcraft/Int
 
 - Open it with `/pv`, or with the **Pocket Vendor** button on any merchant window.
 - **Sell** and **Keep** tabs. Drag an item onto the window, or shift-click an item into the box and press **Add**.
+- For a ranked item such as Scroll of Spirit IV, you are asked whether to add every rank or only that one.
 - Right-click an item in the list to remove it.
 - The **Auto-sell on loot** checkbox does the same as `.vendor on/off`.
 - `/pv sync` reloads the lists from the server.
@@ -75,6 +76,7 @@ Run `.reload config` to apply changes without restarting the server.
 
 ### Unreleased
 
+- Added a question when you add a ranked item such as Scroll of Spirit IV to the Sell or Keep list: add every rank, or only that one. Ranks that can't be sold are skipped.
 - Fixed quest-class items such as Green Hills of Stranglethorn pages not being allowed on the sell list. They are still kept while an active quest needs them.
 
 ### v1.0.0
