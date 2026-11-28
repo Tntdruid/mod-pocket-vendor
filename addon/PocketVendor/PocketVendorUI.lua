@@ -1,4 +1,4 @@
--- PocketVendorUI.lua – dark panel with Sell/Keep tabs, drop zone and item list
+-- PocketVendorUI.lua – dark panel with Sell/Keep/Shop tabs, drop zone and item list
 local ADDON_NAME = ...
 local addon = _G[ADDON_NAME]
 
@@ -7,6 +7,10 @@ local VISIBLE_ROWS = 12
 local WIDTH = 380
 
 local GOLD = { 1, 0.85, 0 }
+
+-- Shop rows are grouped in this order
+local CATEGORY_ORDER = { A = 1, R = 2, P = 3, F = 4 }
+local CATEGORY_NAMES = { A = "Ammo", R = "Reagent", P = "Potion", F = "Food & drink" }
 
 -- Hidden tooltip used to ask the server for item data that isn't cached yet
 local scanTip = CreateFrame("GameTooltip", "PocketVendorScanTip", UIParent, "GameTooltipTemplate")
@@ -83,9 +87,11 @@ local function CreateMainFrame()
     ---------------------------------------------------------------------
     -- TABS
     ---------------------------------------------------------------------
-    local function MakeTab(x, text, listKey, tip)
+    local TAB_WIDTH = math.floor((WIDTH - 32 - 16) / 3)
+    local function MakeTab(index, text, listKey, tip)
+        local x = 16 + (index - 1) * (TAB_WIDTH + 8)
         local btn = CreateFrame("Button", nil, frame)
-        btn:SetSize(170, 24)
+        btn:SetSize(TAB_WIDTH, 24)
         btn:SetPoint("TOPLEFT", x, -40)
         btn.bg = Solid(btn, "BACKGROUND", 0.15, 0.15, 0.15, 0.7)
         btn.bg:SetAllPoints()
@@ -106,6 +112,9 @@ local function CreateMainFrame()
 
         btn:SetScript("OnClick", function()
             addon.activeTab = listKey
+            if listKey == "shop" and not addon.shopLoaded then
+                addon:RequestShop()
+            end
             addon:RefreshUI()
         end)
         btn:SetScript("OnEnter", function(self)
@@ -118,8 +127,9 @@ local function CreateMainFrame()
         return btn
     end
 
-    local tabSell = MakeTab(16, "Sell", "sell", "Sold automatically when you loot them, whatever their quality.")
-    local tabKeep = MakeTab(WIDTH - 186, "Keep", "keep", "Never sold, not even grey items.")
+    local tabSell = MakeTab(1, "Sell", "sell", "Sold automatically when you loot them, whatever their quality.")
+    local tabKeep = MakeTab(2, "Keep", "keep", "Never sold, not even grey items.")
+    local tabShop = MakeTab(3, "Shop", "shop", "Buy ammo, reagents, potions, food and drink for your level, anywhere. Same price as a vendor.")
 
     ---------------------------------------------------------------------
     -- LIST (FauxScrollFrame so it scrolls past the visible rows)
@@ -158,6 +168,34 @@ local function CreateMainFrame()
         row.text:SetPoint("RIGHT", -24, 0)
         row.text:SetJustifyH("LEFT")
 
+        row.price = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        row.price:SetPoint("RIGHT", -52, 0)
+        row.price:SetJustifyH("RIGHT")
+
+        row.buy = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        row.buy:SetSize(44, 18)
+        row.buy:SetPoint("RIGHT", -2, 0)
+        row.buy:SetText("Buy")
+        SkinButton(row.buy)
+        row.buy:SetScript("OnClick", function()
+            local offer = row.offer
+            if not offer then return end
+            local lots = 1
+            if IsShiftKeyDown() then
+                -- A full stack, e.g. 200 arrows or 20 potions
+                local stack = select(8, GetItemInfo(offer.id)) or offer.lotSize
+                lots = math.max(1, math.floor(stack / offer.lotSize))
+            end
+            addon:Buy(offer.id, lots)
+        end)
+        row.buy:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine("Buy")
+            GameTooltip:AddLine("Click: buy one lot. Shift-click: buy a full stack.", 1, 1, 1, true)
+            GameTooltip:Show()
+        end)
+        row.buy:SetScript("OnLeave", GameTooltip_Hide)
+
         row.remove = row:CreateTexture(nil, "OVERLAY")
         row.remove:SetSize(12, 12)
         row.remove:SetPoint("RIGHT", -6, 0)
@@ -166,7 +204,7 @@ local function CreateMainFrame()
 
         row:SetScript("OnClick", function(self, button)
             if not self.itemID then return end
-            if button == "RightButton" then
+            if button == "RightButton" and not self.offer then
                 addon:RemoveItem(self.itemID)
             elseif IsModifiedClick("CHATLINK") then
                 local _, link = GetItemInfo(self.itemID)
@@ -176,10 +214,12 @@ local function CreateMainFrame()
         row:SetScript("OnEnter", function(self)
             if not self.itemID then return end
             self.bg:SetVertexColor(0.3, 0.3, 0.3, 0.5)
-            self.remove:Show()
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetHyperlink("item:" .. self.itemID)
-            GameTooltip:AddLine("Right-click to remove", 0.6, 0.6, 0.6)
+            if not self.offer then
+                self.remove:Show()
+                GameTooltip:AddLine("Right-click to remove", 0.6, 0.6, 0.6)
+            end
             GameTooltip:Show()
         end)
         row:SetScript("OnLeave", function(self)
@@ -190,7 +230,7 @@ local function CreateMainFrame()
         -- Dropping straight on the list works too
         row:SetScript("OnReceiveDrag", function()
             local id = CursorItemId()
-            if id then
+            if id and addon.activeTab ~= "shop" then
                 addon:AddItem(id, addon.activeTab)
                 ClearCursor()
             end
@@ -213,7 +253,7 @@ local function CreateMainFrame()
 
     local function OnDrop()
         local id = CursorItemId()
-        if id then
+        if id and addon.activeTab ~= "shop" then
             addon:AddItem(id, addon.activeTab)
             ClearCursor()
         end
@@ -286,6 +326,12 @@ local function CreateMainFrame()
     local status = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     status:SetPoint("BOTTOMRIGHT", -16, 18)
 
+    local money = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    money:SetPoint("BOTTOMLEFT", 18, 18)
+
+    -- Parts of the window that only belong to the Sell/Keep lists
+    local listOnly = { drop, input, addBtn, autoSell }
+
     ---------------------------------------------------------------------
     -- REFRESH
     ---------------------------------------------------------------------
@@ -301,27 +347,59 @@ local function CreateMainFrame()
         end
     end)
 
+    local function NameOf(id) return GetItemInfo(id) or "" end
+
+    -- The rows to draw: { id = itemID, offer = shop offer or nil }
+    local function CurrentEntries()
+        local entries = {}
+        if addon.activeTab == "shop" then
+            for _, offer in ipairs(addon.shop) do
+                entries[#entries + 1] = { id = offer.id, offer = offer }
+            end
+            table.sort(entries, function(a, b)
+                local ca, cb = CATEGORY_ORDER[a.offer.category] or 9, CATEGORY_ORDER[b.offer.category] or 9
+                if ca ~= cb then return ca < cb end
+                return NameOf(a.id) < NameOf(b.id)
+            end)
+        else
+            for id in pairs(addon:GetList(addon.activeTab)) do
+                entries[#entries + 1] = { id = id }
+            end
+            table.sort(entries, function(a, b)
+                local na, nb = NameOf(a.id), NameOf(b.id)
+                if na == nb then return a.id < b.id end
+                return na < nb
+            end)
+        end
+        return entries
+    end
+
     function addon:RefreshUI()
         if not frame:IsShown() then return end
 
-        local ids = {}
-        for id in pairs(self:GetList(self.activeTab)) do
-            ids[#ids + 1] = id
-        end
+        local shopping = self.activeTab == "shop"
+        local entries = CurrentEntries()
 
-        local function NameOf(id) return GetItemInfo(id) or "" end
-        table.sort(ids, function(a, b)
-            local na, nb = NameOf(a), NameOf(b)
-            if na == nb then return a < b end
-            return na < nb
-        end)
-
-        FauxScrollFrame_Update(scroll, #ids, VISIBLE_ROWS, ROW_HEIGHT)
+        FauxScrollFrame_Update(scroll, #entries, VISIBLE_ROWS, ROW_HEIGHT)
         local offset = FauxScrollFrame_GetOffset(scroll)
 
         waitingForItems = false
         for i, row in ipairs(rows) do
-            local id = ids[i + offset]
+            local entry = entries[i + offset]
+            local id = entry and entry.id
+            row.offer = entry and entry.offer
+            if row.offer then
+                local lot = row.offer.lotSize > 1 and ("|cffaaaaaa" .. row.offer.lotSize .. " for|r ") or ""
+                row.price:SetText(lot .. GetCoinTextureString(row.offer.lotPrice))
+                row.price:Show()
+                row.buy:Show()
+                if GetMoney() >= row.offer.lotPrice then row.buy:Enable() else row.buy:Disable() end
+                row.text:SetPoint("RIGHT", row.price, "LEFT", -6, 0)
+            else
+                row.price:Hide()
+                row.buy:Hide()
+                row.text:SetPoint("RIGHT", -24, 0)
+            end
             if id then
                 local name, _, quality, _, _, _, _, _, _, texture = GetItemInfo(id)
                 if not name then
@@ -331,7 +409,11 @@ local function CreateMainFrame()
                 local r, g, b = GetItemQualityColor(quality or 1)
                 row.itemID = id
                 row.icon:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
-                row.text:SetText(name or ("Item #" .. id))
+                local label = name or ("Item #" .. id)
+                if row.offer then
+                    label = label .. "  |cff808080" .. (CATEGORY_NAMES[row.offer.category] or "") .. "|r"
+                end
+                row.text:SetText(label)
                 row.text:SetTextColor(r, g, b)
                 row:Show()
             else
@@ -344,16 +426,33 @@ local function CreateMainFrame()
 
         tabSell:SetActive(self.activeTab == "sell")
         tabKeep:SetActive(self.activeTab == "keep")
+        tabShop:SetActive(shopping)
         tabSell.label:SetText(("Sell (%d)"):format(Count(self.sell)))
         tabKeep.label:SetText(("Keep (%d)"):format(Count(self.keep)))
 
-        if #ids == 0 then
-            empty:SetText(self.activeTab == "sell"
-                and "Your sell list is empty.\nDrop items here to sell them when you loot them."
-                or "Your keep list is empty.\nDrop items here to never sell them.")
+        if #entries == 0 then
+            if shopping then
+                empty:SetText(not self.shopEnabled and "The shop is disabled on this server."
+                    or self.shopLoaded and "Nothing for sale for your level right now."
+                    or "Loading the shop...")
+            elseif self.activeTab == "sell" then
+                empty:SetText("Your sell list is empty.\nDrop items here to sell them when you loot them.")
+            else
+                empty:SetText("Your keep list is empty.\nDrop items here to never sell them.")
+            end
             empty:Show()
         else
             empty:Hide()
+        end
+
+        for _, widget in ipairs(listOnly) do
+            if shopping then widget:Hide() else widget:Show() end
+        end
+        if shopping then
+            money:SetText("Your money: " .. GetCoinTextureString(GetMoney()))
+            money:Show()
+        else
+            money:Hide()
         end
 
         drop.label:SetText(self.activeTab == "sell"

@@ -4,12 +4,14 @@
 -- characters database. This file only sends requests and mirrors the answers.
 --
 -- Client -> server (addon whisper to yourself, prefix PVEND):
---   SYNC | ADD:<S|K>:<id>[:ALL] | DEL:<id> | TOGGLE:<0|1>
+--   SYNC | ADD:<S|K>:<id>[:ALL] | DEL:<id> | TOGGLE:<0|1> | SHOP | BUY:<id>:<lots>
 --   (:ALL adds every rank of the item, e.g. Scroll of Spirit I-IV)
 -- Server -> client:
 --   STATE:<module on>:<auto-sell on>:<toggle allowed>
 --   LIST:BEGIN | LIST:S:<id,id,...> | LIST:K:<id,id,...> | LIST:END
 --   ADDED:<S|K>:<id,id,...> | REMOVED:<id> | ERR:<text>
+--   SHOP:STATE:<0|1> | SHOP:BEGIN | SHOP:ITEM:<A|R|P|F>:<id>:<lot size>:<lot price> | SHOP:END
+--   BOUGHT:<id>:<count>:<cost>
 
 local ADDON_NAME = ...
 local PREFIX = "PVEND"
@@ -23,6 +25,9 @@ local addon = {
     autoSell = true,
     toggleAllowed = true,
     activeTab = "sell",
+    shop = {},          -- { { category, id, lotSize, lotPrice }, ... }
+    shopEnabled = true,
+    shopLoaded = false,
 }
 _G[ADDON_NAME] = addon
 
@@ -117,6 +122,19 @@ function addon:RemoveItem(id)
     end
 end
 
+function addon:RequestShop()
+    if self.connected then
+        Send("SHOP")
+    end
+end
+
+-- Buys whole lots: one lot is the vendor's stack, e.g. 200 arrows
+function addon:Buy(id, lots)
+    if id and self.connected then
+        Send("BUY:" .. id .. ":" .. (lots or 1))
+    end
+end
+
 function addon:SetAutoSell(enabled)
     Send("TOGGLE:" .. (enabled and "1" or "0"))
 end
@@ -179,6 +197,37 @@ local function OnServerMessage(body)
         return Refresh()
     end
 
+    local shopState = body:match("^SHOP:STATE:(%d)$")
+    if shopState then
+        addon.shopEnabled = shopState == "1"
+        return
+    end
+
+    if body == "SHOP:BEGIN" then
+        pending.shop = {}
+        return
+    end
+
+    local category, shopId, lotSize, lotPrice = body:match("^SHOP:ITEM:(%a):(%d+):(%d+):(%d+)$")
+    if category and pending.shop then
+        table.insert(pending.shop, {
+            category = category, id = tonumber(shopId), lotSize = tonumber(lotSize), lotPrice = tonumber(lotPrice),
+        })
+        return
+    end
+
+    if body == "SHOP:END" then
+        addon.shop = pending.shop or {}
+        addon.shopLoaded = true
+        pending.shop = nil
+        return Refresh()
+    end
+
+    if body:match("^BOUGHT:") then
+        -- The server already told the player in chat; just redraw prices against the new money
+        return Refresh()
+    end
+
     local removedId = body:match("^REMOVED:(%d+)$")
     if removedId then
         removedId = tonumber(removedId)
@@ -199,6 +248,11 @@ end
 local events = CreateFrame("Frame")
 events:RegisterEvent("CHAT_MSG_ADDON")
 events:RegisterEvent("PLAYER_ENTERING_WORLD")
+-- What the shop offers depends on level, skills and known spells
+events:RegisterEvent("PLAYER_LEVEL_UP")
+events:RegisterEvent("LEARNED_SPELL_IN_TAB")
+events:RegisterEvent("SKILL_LINES_CHANGED")
+events:RegisterEvent("PLAYER_MONEY")
 events:SetScript("OnEvent", function(_, event, prefix, message)
     if event == "CHAT_MSG_ADDON" then
         if prefix == PREFIX then
@@ -208,6 +262,13 @@ events:SetScript("OnEvent", function(_, event, prefix, message)
         -- Only the first load screen; later ones keep the lists we have
         events:UnregisterEvent("PLAYER_ENTERING_WORLD")
         addon:Sync()
+    elseif event == "PLAYER_MONEY" then
+        Refresh()
+    else
+        addon.shopLoaded = false
+        if addon.activeTab == "shop" and addon.UIFrame and addon.UIFrame:IsShown() then
+            addon:RequestShop()
+        end
     end
 end)
 

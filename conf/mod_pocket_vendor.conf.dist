@@ -90,3 +90,98 @@ PocketVendor.PlayerLists = 1
 #
 
 PocketVendor.MaxListSize = 200
+
+########################################
+# Supplies: bot shopping and the addon's Shop tab
+########################################
+#
+# Nothing is free: every purchase costs the vendor price, paid from the
+# character's own gold. Offered per level: the best arrows/bullets, healing and
+# mana potions, food and drink, plus the vendor-sold reagents of spells the
+# character knows (Symbol of Kings, Arcane Powder, Wild Quillvine, Ankh, ...).
+#
+# To stop bots getting the same things for free, also set these in
+# playerbots.conf: Playerbots.AltMaintenanceAmmo, AltMaintenanceReagents,
+# AltMaintenancePotions and AltMaintenanceFood = 0. mod-bot-reagents is no
+# longer needed and should be removed, or bots shop twice.
+#
+#    PocketVendor.Shop.Enable
+#        Description: Players can buy supplies from the addon's Shop tab, anywhere.
+#        Default:     1 - Enabled
+#                     0 - Disabled
+#
+
+PocketVendor.Shop.Enable = 1
+
+#
+#    PocketVendor.Shop.PriceRate
+#        Description: Price in percent of the vendor price, for players and bots.
+#        Default:     100
+#
+
+PocketVendor.Shop.PriceRate = 100
+
+#
+#    PocketVendor.BotSupplies.Enable
+#        Description: Bots (mod-playerbots) buy their own supplies, wherever they are.
+#        Default:     1 - Enabled
+#                     0 - Disabled
+#
+
+PocketVendor.BotSupplies.Enable = 1
+
+#
+#    PocketVendor.BotSupplies.Interval
+#        Description: Milliseconds between a bot's shopping trips.
+#        Default:     300000 (5 minutes)
+#
+
+PocketVendor.BotSupplies.Interval = 300000
+
+#
+#    PocketVendor.BotSupplies.GoldReserve
+#        Description: Copper a bot always keeps; it never shops below this.
+#        Default:     10000 (1 gold)
+#
+
+PocketVendor.BotSupplies.GoldReserve = 10000
+
+#
+#    PocketVendor.BotSupplies.Ammo
+#    PocketVendor.BotSupplies.Reagents
+#    PocketVendor.BotSupplies.Potions
+#    PocketVendor.BotSupplies.Food
+#    PocketVendor.BotSupplies.Drink
+#        Description: How many a bot keeps of each item. Ammo only for bots with a
+#                     bow, crossbow or gun; mana potions and drink only for mana users.
+#                     0 turns that kind off. Food and drink are off by default because
+#                     Playerbots.BotCheats = "food" already lets bots eat for free.
+#        Default:     Ammo 1000, Reagents 20, Potions 5, Food 0, Drink 0
+#
+
+PocketVendor.BotSupplies.Ammo = 1000
+PocketVendor.BotSupplies.Reagents = 20
+PocketVendor.BotSupplies.Potions = 5
+PocketVendor.BotSupplies.Food = 0
+PocketVendor.BotSupplies.Drink = 0
+
+#
+#    PocketVendor.BotSupplies.Log
+#        Description: Write a line to the worldserver log for every bot purchase,
+#                     and when a bot needs something but lacks the money or bag space.
+#        Default:     0 - Off
+#                     1 - On
+#
+
+PocketVendor.BotSupplies.Log = 0
+
+#
+#    PocketVendor.BotSupplies.TellGroup
+#        Description: After a shopping trip, a bot tells the real players in its party
+#                     or raid what it bought, e.g.
+#                     "[Huntbot] bought [Jagged Arrow] x1000, [Healing Potion] x5 for 1g 2s".
+#        Default:     1 - On
+#                     0 - Off
+#
+
+PocketVendor.BotSupplies.TellGroup = 1
