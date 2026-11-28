@@ -106,7 +106,7 @@ Run `.reload config` to apply changes without restarting the server.
 
 ## Changelog
 
-### Unreleased
+### v1.3.0
 
 - Added `PocketVendor.BotSupplies.RefillPercent` (default 25): bots only shop for an item once they are down to that share of what they keep, then fill all the way up, instead of topping up after every shot.
 
