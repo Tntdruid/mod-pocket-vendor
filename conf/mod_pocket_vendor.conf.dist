@@ -166,6 +166,17 @@ PocketVendor.BotSupplies.Food = 0
 PocketVendor.BotSupplies.Drink = 0
 
 #
+#    PocketVendor.BotSupplies.RefillPercent
+#        Description: A bot only shops for an item once it is down to this percent
+#                     of the amount above, and then buys all the way back up. With
+#                     Ammo = 1000 and 25, it buys when it has fewer than 250 left.
+#                     100 tops up after every shot; 0 waits until it has none left.
+#        Default:     25
+#
+
+PocketVendor.BotSupplies.RefillPercent = 25
+
+#
 #    PocketVendor.BotSupplies.Log
 #        Description: Write a line to the worldserver log for every bot purchase,
 #                     and when a bot needs something but lacks the money or bag space.

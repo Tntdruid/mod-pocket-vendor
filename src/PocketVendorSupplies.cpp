@@ -78,6 +78,7 @@ namespace
         uint32 botDrink = 0;
         bool botLog = false;
         bool botTellGroup = true;
+        uint32 botRefillPercent = 25;
     };
 
     SuppliesConfig sSuppliesConfig;
@@ -499,8 +500,11 @@ namespace
             return;
         }
 
+        // Only shop once the stock is down to RefillPercent of the target (always below
+        // 1 left), then buy all the way back up, so bots make few, big trips
         uint32 have = bot->GetItemCount(proto->ItemId);
-        if (have >= target)
+        uint32 refillAt = std::max<uint32>(target * sSuppliesConfig.botRefillPercent / 100, 1);
+        if (have >= target || have >= refillAt)
         {
             return;
         }
@@ -773,6 +777,7 @@ public:
         sSuppliesConfig.botDrink = sConfigMgr->GetOption<uint32>("PocketVendor.BotSupplies.Drink", 0);
         sSuppliesConfig.botLog = sConfigMgr->GetOption<bool>("PocketVendor.BotSupplies.Log", false);
         sSuppliesConfig.botTellGroup = sConfigMgr->GetOption<bool>("PocketVendor.BotSupplies.TellGroup", true);
+        sSuppliesConfig.botRefillPercent = std::min<uint32>(sConfigMgr->GetOption<uint32>("PocketVendor.BotSupplies.RefillPercent", 25), 100);
     }
 
     void OnStartup() override

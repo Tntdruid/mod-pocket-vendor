@@ -25,7 +25,7 @@ Nothing is free. Every purchase costs the item's vendor price (times `PocketVend
 | Potions       | Healing and mana potions made by Alchemy, since no vendor sells potions            | Everyone; mana potions only for mana users       |
 | Food & drink  | Food and drink sold for gold by any vendor                                          | Shop: everyone. Bots: off by default             |
 
-Bots also equip the new ammo when it is better than what they shoot. A bot in your party or raid tells you in chat what it bought. They never spend below `PocketVendor.BotSupplies.GoldReserve`.
+Bots only shop for an item once they are down to `PocketVendor.BotSupplies.RefillPercent` (25%) of the amount they keep, e.g. below 250 of 1000 arrows, and then fill all the way up. Bots also equip the new ammo when it is better than what they shoot. A bot in your party or raid tells you in chat what it bought. They never spend below `PocketVendor.BotSupplies.GoldReserve`.
 
 To stop bots getting the same things for free, set `Playerbots.AltMaintenanceAmmo`, `AltMaintenanceReagents`, `AltMaintenancePotions` and `AltMaintenanceFood` to `0` in `playerbots.conf`. This module replaces mod-bot-reagents, so remove that module, or bots shop twice.
 
@@ -98,12 +98,17 @@ The on/off choice is saved across logins only when `EnablePlayerSettings = 1` is
 | `PocketVendor.BotSupplies.Potions` | `5` | Of each potion a bot keeps                        |
 | `PocketVendor.BotSupplies.Food` | `0`   | Food a bot keeps (`0` = off)                        |
 | `PocketVendor.BotSupplies.Drink` | `0`  | Drink a bot keeps (`0` = off)                       |
+| `PocketVendor.BotSupplies.RefillPercent` | `25` | Bots only shop once they are down to this percent, then fill up |
 | `PocketVendor.BotSupplies.Log` | `0`    | Log every bot purchase to the worldserver log       |
 | `PocketVendor.BotSupplies.TellGroup` | `1` | Bots tell your party/raid in chat what they bought |
 
 Run `.reload config` to apply changes without restarting the server.
 
 ## Changelog
+
+### Unreleased
+
+- Added `PocketVendor.BotSupplies.RefillPercent` (default 25): bots only shop for an item once they are down to that share of what they keep, then fill all the way up, instead of topping up after every shot.
 
 ### v1.2.0
 
