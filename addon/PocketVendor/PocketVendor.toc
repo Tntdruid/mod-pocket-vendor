@@ -1,7 +1,7 @@
 ## Interface: 30300
 ## Title: PocketVendor
 ## Notes: Edit your personal sell and keep lists for the mod-pocket-vendor server module
-## Version: 1.1.0
+## Version: 1.2.0
 ## Author: Tntdruid
 PocketVendor.lua
 PocketVendorUI.lua

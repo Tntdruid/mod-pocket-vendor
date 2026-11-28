@@ -105,7 +105,7 @@ Run `.reload config` to apply changes without restarting the server.
 
 ## Changelog
 
-### Unreleased
+### v1.2.0
 
 - Added bot shopping: bots buy their own ammo, reagents and potions every 5 minutes, wherever they are, and pay the vendor price from their own gold. They equip better ammo. Replaces mod-bot-reagents. Bots in your party or raid tell you in chat what they bought. `PocketVendor.BotSupplies.Log = 1` logs each purchase.
 - Added a Shop tab to the addon where players buy ammo, reagents, potions, food and drink for their level, anywhere, at the vendor price.
